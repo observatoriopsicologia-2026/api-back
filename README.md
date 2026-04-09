@@ -1,4 +1,4 @@
-# API Backend – Observatorio de Psicología Organizacional y del Trabajo
+# Observatorio de Psicología Organizacional y del Trabajo
 
 ## Descripción del proyecto
 

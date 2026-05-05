@@ -5,13 +5,13 @@ Este repositorio contiene el backend del proyecto Observatorio, desarrollado con
 ##  Estructura del proyecto
 
 api-back/
-  backend/
-    src/
-    package.json
-    package-lock.json
-    .env.example
-  .gitignore
-  README.md
+ backend/
+  src/
+   package.json
+   package-lock.json
+   .env.example
+   .gitignore
+   README.md
 
 ## Instalación
 

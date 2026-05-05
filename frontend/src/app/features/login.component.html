@@ -1,0 +1,23 @@
+<section class="auth-page">
+  <form class="auth-card" (ngSubmit)="submit()">
+    <span class="eyebrow">Panel privado</span>
+    <h1>Acceso administrador</h1>
+    <p>Ingresa para gestionar noticias, eventos, investigadores, recursos y publicaciones con PDF.</p>
+
+    <label>
+      <span>Correo</span>
+      <input name="email" [(ngModel)]="email" type="email" required autocomplete="email">
+    </label>
+    <label>
+      <span>Contraseña</span>
+      <input name="password" [(ngModel)]="password" type="password" required autocomplete="current-password">
+    </label>
+
+    <p class="state-message error" *ngIf="error">{{ error }}</p>
+    <button class="primary-button wide" type="submit" [disabled]="loading">
+      {{ loading ? 'Ingresando...' : 'Ingresar' }}
+    </button>
+    <a routerLink="/">Volver al sitio público</a>
+  </form>
+</section>
+

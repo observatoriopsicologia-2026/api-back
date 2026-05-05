@@ -1,0 +1,33 @@
+<section class="page-hero compact">
+  <span class="eyebrow">Observatorio POT</span>
+  <h1>{{ title }}</h1>
+  <p>{{ subtitle }}</p>
+</section>
+
+<section class="content-band">
+  <form class="toolbar" (ngSubmit)="load()">
+    <label>
+      <span>Buscar</span>
+      <input name="q" [(ngModel)]="q" type="search" placeholder="Buscar en esta sección">
+    </label>
+    <button class="primary-button" type="submit">Buscar</button>
+  </form>
+
+  <p class="state-message" *ngIf="loading">Cargando...</p>
+  <p class="state-message error" *ngIf="error">{{ error }}</p>
+
+  <div class="card-grid collection-grid" *ngIf="!loading && items.length">
+    <article class="collection-card" *ngFor="let item of items">
+      <span class="pill" *ngIf="item['category'] || item['type']">{{ item['category'] || item['type'] }}</span>
+      <h2>{{ titleFor(item) }}</h2>
+      <p class="muted">{{ metaFor(item) }}</p>
+      <p>{{ descriptionFor(item) }}</p>
+      <a *ngIf="linkFor(item)" [href]="linkFor(item)" target="_blank" rel="noreferrer">Abrir enlace →</a>
+    </article>
+  </div>
+
+  <p class="empty-state" *ngIf="!loading && !items.length">
+    Esta sección está lista para recibir contenido desde el panel admin.
+  </p>
+</section>
+

@@ -1,0 +1,136 @@
+<section class="hero-section">
+  <div class="hero-copy">
+    <span class="eyebrow">Plataforma colaborativa</span>
+    <h1>Observatorio de Psicología Organizacional y del Trabajo</h1>
+    <p>Análisis, investigación y desarrollo de la Psicología Organizacional y del Trabajo en toda Iberoamérica.</p>
+    <div class="hero-actions">
+      <a class="primary-button" routerLink="/publicaciones">Explorar el repositorio</a>
+      <a class="ghost-button" routerLink="/directorio">Ver directorio</a>
+    </div>
+  </div>
+
+  <div class="hero-visual" aria-label="Mapa conceptual del observatorio">
+    <div class="visual-card">
+      <div class="visual-globe">◎</div>
+      <h2>Observatorio de Psicología Organizacional</h2>
+      <p>Explorando la investigación y práctica profesional en toda Iberoamérica</p>
+      <div class="network-map">
+        <span class="node node-a"></span>
+        <span class="node node-b"></span>
+        <span class="node node-c"></span>
+        <span class="node node-d"></span>
+        <span class="node node-e"></span>
+      </div>
+    </div>
+    <div class="stats-panel">
+      <strong>9</strong><span>Países</span>
+      <strong>250+</strong><span>Investigadores</span>
+      <strong>35+</strong><span>Universidades</span>
+      <strong>720+</strong><span>Publicaciones</span>
+    </div>
+  </div>
+</section>
+
+<section class="quick-grid content-band">
+  <a *ngFor="let item of quickLinks" class="quick-card" [ngClass]="item.tone" [routerLink]="item.path">
+    <span class="quick-icon"></span>
+    <h2>{{ item.title }}</h2>
+    <p>{{ item.text }}</p>
+    <small>Explorar →</small>
+  </a>
+</section>
+
+<section class="content-band centered">
+  <h2>Panorama Regional POT</h2>
+  <p>Explora datos sobre la investigación y práctica de la Psicología Organizacional y del Trabajo en Iberoamérica.</p>
+  <div class="bar-chart" aria-label="Distribución de publicaciones académicas por país">
+    <div class="bar-item" *ngFor="let country of countries">
+      <span class="bar" [ngClass]="country.color" [style.height.%]="country.value"></span>
+      <small>{{ country.name }}</small>
+    </div>
+  </div>
+  <small class="chart-caption">Distribución de publicaciones académicas en POT por país.</small>
+</section>
+
+<section class="content-band" *ngIf="researchers.length">
+  <div class="section-heading">
+    <div>
+      <h2>Directorio destacado</h2>
+      <p>Investigadores y profesionales vinculados a la red.</p>
+    </div>
+    <a routerLink="/directorio">Ver todos</a>
+  </div>
+  <div class="card-grid people-grid">
+    <article class="person-card" *ngFor="let person of researchers">
+      <span class="avatar">{{ person.name.charAt(0) }}</span>
+      <h3>{{ person.name }}</h3>
+      <p>{{ person.specialty }}</p>
+      <small>{{ person.institution }} · {{ person.country }}</small>
+    </article>
+  </div>
+</section>
+
+<section class="content-band">
+  <div class="section-heading">
+    <div>
+      <h2>Próximos eventos</h2>
+      <p>Actividades académicas de la comunidad iberoamericana.</p>
+    </div>
+    <a routerLink="/eventos">Ver todos</a>
+  </div>
+  <div class="card-grid">
+    <article class="event-card" *ngFor="let event of events">
+      <div class="date-strip">{{ event.starts_at | date: 'd MMMM y' }}</div>
+      <span class="pill">{{ event.category || event.modality }}</span>
+      <h3>{{ event.title }}</h3>
+      <p>{{ event.description }}</p>
+      <small>{{ event.location }}</small>
+    </article>
+  </div>
+</section>
+
+<section class="content-band">
+  <div class="section-heading">
+    <div>
+      <h2>Noticias y novedades</h2>
+      <p>Convocatorias, resultados y avances del observatorio.</p>
+    </div>
+    <a routerLink="/noticias">Ver todas</a>
+  </div>
+  <div class="card-grid">
+    <article class="news-card" *ngFor="let item of news">
+      <small>{{ item.published_at | date: 'd MMMM y' }}</small>
+      <h3>{{ item.title }}</h3>
+      <p>{{ item.summary }}</p>
+      <a [routerLink]="['/noticias']">Leer más →</a>
+    </article>
+  </div>
+</section>
+
+<section class="cta-band">
+  <h2>¿Interesado en colaborar con el Observatorio?</h2>
+  <p>Únete a nuestra comunidad de investigadores y profesionales comprometidos con el desarrollo de la POT en Iberoamérica.</p>
+  <a class="primary-button" routerLink="/recursos">Contactarnos hoy</a>
+</section>
+
+<section class="content-band centered">
+  <h2>El futuro del trabajo en Iberoamérica</h2>
+  <p>Explorando tendencias e innovaciones en psicología organizacional para preparar a las empresas iberoamericanas.</p>
+  <div class="future-grid">
+    <article>
+      <span>↗</span>
+      <h3>Tendencias emergentes</h3>
+      <p>Investigaciones sobre trabajo híbrido, bienestar digital y nuevos modelos de liderazgo.</p>
+    </article>
+    <article>
+      <span>♙</span>
+      <h3>Capital humano</h3>
+      <p>Estrategias para potenciar talento local, colaboración transnacional y entornos inclusivos.</p>
+    </article>
+    <article>
+      <span>▤</span>
+      <h3>Organizaciones sostenibles</h3>
+      <p>Prácticas responsables adaptadas al contexto iberoamericano.</p>
+    </article>
+  </div>
+</section>

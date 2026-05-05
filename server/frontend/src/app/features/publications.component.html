@@ -1,0 +1,53 @@
+<section class="page-hero compact">
+  <span class="eyebrow">Repositorio académico</span>
+  <h1>Publicaciones</h1>
+  <p>Consulta artículos, informes, libros y documentos de trabajo del Observatorio POT.</p>
+</section>
+
+<section class="content-band">
+  <form class="toolbar" (ngSubmit)="load()">
+    <label>
+      <span>Buscar</span>
+      <input name="q" [(ngModel)]="q" type="search" placeholder="Título, autor, país o etiqueta">
+    </label>
+    <button class="primary-button" type="submit">Buscar</button>
+  </form>
+
+  <p class="state-message" *ngIf="loading">Cargando publicaciones...</p>
+  <p class="state-message error" *ngIf="error">{{ error }}</p>
+
+  <div class="publication-list" *ngIf="!loading">
+    <article class="publication-card" *ngFor="let item of publications">
+      <div>
+        <span class="pill" *ngIf="item.year">{{ item.year }}</span>
+        <h2>{{ item.title }}</h2>
+        <p class="muted">{{ item.authors }}</p>
+        <p>{{ item.abstract }}</p>
+        <div class="tag-row" *ngIf="item.tags?.length">
+          <span *ngFor="let tag of item.tags">{{ tag }}</span>
+        </div>
+      </div>
+      <div class="publication-actions">
+        <button class="outline-button" type="button" [disabled]="!item.file_path" (click)="preview(item)">
+          Previsualizar PDF
+        </button>
+        <a class="primary-button" [class.disabled]="!item.file_path" [href]="downloadUrl(item)">Descargar</a>
+      </div>
+    </article>
+  </div>
+
+  <p class="empty-state" *ngIf="!loading && !publications.length">
+    Aún no hay publicaciones cargadas. Desde el panel admin puedes agregar el primer PDF.
+  </p>
+</section>
+
+<div class="modal-backdrop" *ngIf="previewUrl" (click)="previewUrl = undefined">
+  <section class="pdf-modal" (click)="$event.stopPropagation()">
+    <header>
+      <h2>{{ previewTitle }}</h2>
+      <button class="icon-button" type="button" (click)="previewUrl = undefined" aria-label="Cerrar previsualización">×</button>
+    </header>
+    <iframe [src]="previewUrl" title="Previsualización PDF"></iframe>
+  </section>
+</div>
+

@@ -1,0 +1,257 @@
+<section class="admin-shell">
+  <aside class="admin-sidebar">
+    <div>
+      <span class="eyebrow">Panel admin</span>
+      <h1>Gestión del Observatorio</h1>
+      <p>Administra el contenido público de la plataforma.</p>
+    </div>
+
+    <nav class="admin-tabs" aria-label="Secciones administrables">
+      <button
+        *ngFor="let tab of tabs"
+        type="button"
+        [class.active]="selected.key === tab.key"
+        (click)="selectTab(tab)"
+      >
+        <strong>{{ tab.label }}</strong>
+        <small>{{ tab.description }}</small>
+      </button>
+    </nav>
+
+    <button class="outline-button wide" type="button" (click)="logout()">Cerrar sesión</button>
+  </aside>
+
+  <div class="admin-content">
+    <section class="admin-panel">
+      <div class="section-heading">
+        <div>
+          <h2>{{ editingId ? 'Editar' : 'Crear' }} {{ selected.label | lowercase }}</h2>
+          <p>{{ selected.description }}</p>
+        </div>
+        <button class="ghost-button dark" type="button" (click)="resetDraft()" *ngIf="editingId">Cancelar edición</button>
+      </div>
+
+      <form class="admin-form" (ngSubmit)="submit()">
+        <ng-container [ngSwitch]="selected.key">
+          <ng-container *ngSwitchCase="'publications'">
+            <label class="span-2">
+              <span>Título</span>
+              <input name="pubTitle" [(ngModel)]="draft['title']" required>
+            </label>
+            <label>
+              <span>Autores</span>
+              <input name="authors" [(ngModel)]="draft['authors']">
+            </label>
+            <label>
+              <span>Año</span>
+              <input name="year" [(ngModel)]="draft['year']" type="number">
+            </label>
+            <label>
+              <span>País</span>
+              <input name="country" [(ngModel)]="draft['country']">
+            </label>
+            <label>
+              <span>Fecha de publicación</span>
+              <input name="publishedAt" [(ngModel)]="draft['published_at']" type="date">
+            </label>
+            <label class="span-2">
+              <span>Etiquetas</span>
+              <input name="tags" [(ngModel)]="draft['tags']" placeholder="clima laboral, bienestar, liderazgo">
+            </label>
+            <label class="span-2">
+              <span>Resumen</span>
+              <textarea name="abstract" [(ngModel)]="draft['abstract']" rows="4"></textarea>
+            </label>
+            <label class="span-2">
+              <span>PDF</span>
+              <input name="file" type="file" accept="application/pdf" (change)="onFileChange($event)">
+            </label>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'researchers'">
+            <label>
+              <span>Nombre</span>
+              <input name="name" [(ngModel)]="draft['name']" required>
+            </label>
+            <label>
+              <span>Institución</span>
+              <input name="institution" [(ngModel)]="draft['institution']">
+            </label>
+            <label>
+              <span>País</span>
+              <input name="researcherCountry" [(ngModel)]="draft['country']">
+            </label>
+            <label>
+              <span>Especialidad</span>
+              <input name="specialty" [(ngModel)]="draft['specialty']">
+            </label>
+            <label>
+              <span>Correo</span>
+              <input name="email" [(ngModel)]="draft['email']" type="email">
+            </label>
+            <label>
+              <span>Perfil externo</span>
+              <input name="profileUrl" [(ngModel)]="draft['profile_url']" type="url">
+            </label>
+            <label class="span-2">
+              <span>Bio</span>
+              <textarea name="bio" [(ngModel)]="draft['bio']" rows="4"></textarea>
+            </label>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'events'">
+            <label class="span-2">
+              <span>Título</span>
+              <input name="eventTitle" [(ngModel)]="draft['title']" required>
+            </label>
+            <label>
+              <span>Fecha y hora</span>
+              <input name="startsAt" [(ngModel)]="draft['starts_at']" type="datetime-local">
+            </label>
+            <label>
+              <span>Lugar</span>
+              <input name="location" [(ngModel)]="draft['location']">
+            </label>
+            <label>
+              <span>Modalidad</span>
+              <select name="modality" [(ngModel)]="draft['modality']">
+                <option>Presencial</option>
+                <option>Virtual</option>
+                <option>Híbrido</option>
+              </select>
+            </label>
+            <label>
+              <span>Categoría</span>
+              <input name="category" [(ngModel)]="draft['category']">
+            </label>
+            <label class="span-2">
+              <span>Enlace</span>
+              <input name="eventUrl" [(ngModel)]="draft['url']" type="url">
+            </label>
+            <label class="span-2">
+              <span>Descripción</span>
+              <textarea name="eventDescription" [(ngModel)]="draft['description']" rows="4"></textarea>
+            </label>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'news'">
+            <label class="span-2">
+              <span>Título</span>
+              <input name="newsTitle" [(ngModel)]="draft['title']" required>
+            </label>
+            <label>
+              <span>Fecha</span>
+              <input name="newsDate" [(ngModel)]="draft['published_at']" type="date">
+            </label>
+            <label>
+              <span>URL fuente</span>
+              <input name="sourceUrl" [(ngModel)]="draft['source_url']" type="url">
+            </label>
+            <label class="span-2">
+              <span>Imagen</span>
+              <input name="imageUrl" [(ngModel)]="draft['image_url']" type="url">
+            </label>
+            <label class="span-2">
+              <span>Resumen</span>
+              <textarea name="summary" [(ngModel)]="draft['summary']" rows="3"></textarea>
+            </label>
+            <label class="span-2">
+              <span>Cuerpo</span>
+              <textarea name="body" [(ngModel)]="draft['body']" rows="5"></textarea>
+            </label>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'resources'">
+            <label>
+              <span>Título</span>
+              <input name="resourceTitle" [(ngModel)]="draft['title']" required>
+            </label>
+            <label>
+              <span>Tipo</span>
+              <input name="resourceType" [(ngModel)]="draft['type']" placeholder="Enlace, guía, base de datos">
+            </label>
+            <label class="span-2">
+              <span>URL</span>
+              <input name="resourceUrl" [(ngModel)]="draft['url']" type="url">
+            </label>
+            <label class="span-2">
+              <span>Etiquetas</span>
+              <input name="resourceTags" [(ngModel)]="draft['tags']">
+            </label>
+            <label class="span-2">
+              <span>Descripción</span>
+              <textarea name="resourceDescription" [(ngModel)]="draft['description']" rows="4"></textarea>
+            </label>
+          </ng-container>
+        </ng-container>
+
+        <label class="check-row span-2">
+          <input name="featured" [(ngModel)]="draft['is_featured']" type="checkbox">
+          <span>Destacar en el inicio</span>
+        </label>
+
+        <p class="state-message error span-2" *ngIf="error">{{ error }}</p>
+        <p class="state-message success span-2" *ngIf="success">{{ success }}</p>
+
+        <div class="form-actions span-2">
+          <button class="primary-button" type="submit" [disabled]="saving">
+            {{ saving ? 'Guardando...' : editingId ? 'Guardar cambios' : 'Crear registro' }}
+          </button>
+          <button class="outline-button" type="button" (click)="resetDraft()">Limpiar</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="admin-panel">
+      <div class="section-heading">
+        <div>
+          <h2>Registros</h2>
+          <p>{{ loading ? 'Cargando...' : items.length + ' elementos' }}</p>
+        </div>
+      </div>
+
+      <div class="admin-list">
+        <article *ngFor="let item of items" class="admin-row">
+          <div>
+            <h3>{{ titleFor(item) }}</h3>
+            <p>{{ subtitleFor(item) }}</p>
+          </div>
+          <div class="row-actions">
+            <button
+              class="outline-button"
+              type="button"
+              *ngIf="selected.key === 'publications'"
+              [disabled]="!hasPdf(item)"
+              (click)="preview(item)"
+            >
+              PDF
+            </button>
+            <a
+              class="outline-button"
+              *ngIf="selected.key === 'publications'"
+              [class.disabled]="!hasPdf(item)"
+              [href]="downloadUrl(item)"
+            >
+              Descargar
+            </a>
+            <button class="ghost-button dark" type="button" (click)="edit(item)">Editar</button>
+            <button class="danger-button" type="button" (click)="remove(item)">Eliminar</button>
+          </div>
+        </article>
+      </div>
+
+      <p class="empty-state" *ngIf="!loading && !items.length">No hay registros todavía.</p>
+    </section>
+  </div>
+</section>
+
+<div class="modal-backdrop" *ngIf="previewUrl" (click)="previewUrl = undefined">
+  <section class="pdf-modal" (click)="$event.stopPropagation()">
+    <header>
+      <h2>{{ previewTitle }}</h2>
+      <button class="icon-button" type="button" (click)="previewUrl = undefined" aria-label="Cerrar previsualización">×</button>
+    </header>
+    <iframe [src]="previewUrl" title="Previsualización PDF"></iframe>
+  </section>
+</div>
+

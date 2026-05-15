@@ -26,19 +26,21 @@ const slugify = (value: string) =>
     .replace(/(^-|-$)/g, '')
     .slice(0, 80);
 
-class PublicationStorage {
+export class PublicationStorage {
   private supabase?: SupabaseClient;
   private localDir = resolve(process.cwd(), env.localUploadDir);
 
-  constructor() {
+  constructor(client?: SupabaseClient) {
     if (env.storageDriver === 'supabase') {
       if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
         throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required when STORAGE_DRIVER=supabase.');
       }
 
-      this.supabase = createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
-        auth: { persistSession: false }
-      });
+      this.supabase =
+        client ??
+        createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
+          auth: { persistSession: false }
+        });
     }
   }
 

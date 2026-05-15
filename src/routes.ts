@@ -4,6 +4,17 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { requireAdmin, requireAuth, login, type AuthRequest } from './auth.js';
 import { env } from './config.js';
+import {
+  createDatasetDocument,
+  deleteDatasetDocument,
+  getDatasetDocument,
+  listDatasetDocuments,
+  listDatasetPowerBiDocuments,
+  loadDatasetPivot,
+  loadDatasetAnalytics,
+  toDatasetPowerBiRows,
+  updateDatasetDocument
+} from './dataset.js';
 import { query } from './db.js';
 import { asyncHandler, HttpError } from './http.js';
 import { publicationStorage, safeDownloadName } from './storage.js';
@@ -425,6 +436,32 @@ function toPowerBiRows(data: AnalyticsData) {
   );
 }
 
+/**
+ * @swagger
+ * /api/health:
+ *   get:
+ *     summary: Verificar estado de la API
+ *     description: Comprueba si la API y la conexión a la base de datos están funcionando correctamente.
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: Estado actual de la API
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ *                 databaseConnected:
+ *                   type: boolean
+ *                   example: true
+ *                 databaseError:
+ *                   type: string
+ *                   example: ""
+ */
 router.get(
   '/health',
   asyncHandler(async (_req, res) => {
@@ -452,6 +489,36 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Iniciar sesión
+ *     description: Autentica un usuario y devuelve un token JWT.
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: admin@observatorio.local
+ *               password:
+ *                 type: string
+ *                 example: password123
+ *     responses:
+ *       200:
+ *         description: Login exitoso
+ *       401:
+ *         description: Credenciales inválidas
+ */
 router.post(
   '/auth/login',
   asyncHandler(async (req, res) => {
@@ -460,10 +527,76 @@ router.post(
   })
 );
 
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Obtener usuario autenticado
+ *     description: Devuelve la información del usuario autenticado mediante JWT.
+ *     tags:
+ *       - Auth
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Información del usuario autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *       401:
+ *         description: No autorizado
+ */
 router.get('/auth/me', requireAuth, (req: AuthRequest, res) => {
   res.json({ user: req.user });
 });
 
+/**
+ * @swagger
+ * /api/analytics:
+ *   get:
+ *     summary: Obtener analíticas del observatorio
+ *     description: Devuelve métricas y estadísticas generales del dataset documental.
+ *     tags:
+ *       - Analytics
+ *     responses:
+ *       200:
+ *         description: Analíticas obtenidas correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     documents:
+ *                       type: number
+ *                       example: 120
+ *                     visible_documents:
+ *                       type: number
+ *                       example: 110
+ *                     topics:
+ *                       type: number
+ *                       example: 8
+ *                     sources:
+ *                       type: number
+ *                       example: 4
+ *                     years:
+ *                       type: number
+ *                       example: 15
+ *                 documents_by_year:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 documents_by_topic:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ */
 router.get(
   '/analytics',
   asyncHandler(async (_req, res) => {
@@ -471,6 +604,34 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /api/analytics/powerbi:
+ *   get:
+ *     summary: Obtener datos para Power BI
+ *     description: Devuelve la información analítica transformada para integración con Power BI.
+ *     tags:
+ *       - Analytics
+ *     responses:
+ *       200:
+ *         description: Datos preparados para Power BI
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   category:
+ *                     type: string
+ *                     example: Salud mental
+ *                   value:
+ *                     type: number
+ *                     example: 25
+ *                   year:
+ *                     type: number
+ *                     example: 2025
+ */
 router.get(
   '/analytics/powerbi',
   asyncHandler(async (_req, res) => {
@@ -478,6 +639,562 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /api/dataset/analytics:
+ *   get:
+ *     summary: Obtener analíticas del dataset
+ *     description: Devuelve estadísticas y métricas asociadas al dataset documental del observatorio.
+ *     tags:
+ *       - Dataset
+ *     responses:
+ *       200:
+ *         description: Analíticas del dataset obtenidas correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     documents:
+ *                       type: number
+ *                       example: 150
+ *                     topics:
+ *                       type: number
+ *                       example: 12
+ *                     sources:
+ *                       type: number
+ *                       example: 5
+ *                 documents_by_year:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 documents_by_topic:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 documents_by_source:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ */
+router.get(
+  '/dataset/analytics',
+  asyncHandler(async (_req, res) => {
+    res.json(await loadDatasetAnalytics());
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset/powerbi:
+ *   get:
+ *     summary: Obtener dataset para Power BI
+ *     description: Devuelve los datos del dataset transformados y estructurados para visualización en Power BI.
+ *     tags:
+ *       - Dataset
+ *     responses:
+ *       200:
+ *         description: Datos exportados correctamente para Power BI
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   title:
+ *                     type: string
+ *                     example: Riesgos psicosociales en el trabajo
+ *                   topic:
+ *                     type: string
+ *                     example: Salud mental
+ *                   source:
+ *                     type: string
+ *                     example: ILO
+ *                   year:
+ *                     type: number
+ *                     example: 2024
+ *                   value:
+ *                     type: number
+ *                     example: 18
+ */
+router.get(
+  '/dataset/powerbi',
+  asyncHandler(async (_req, res) => {
+    res.json(toDatasetPowerBiRows(await loadDatasetAnalytics()));
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset/powerbi/documents:
+ *   get:
+ *     summary: Obtener documentos del dataset para Power BI
+ *     description: Devuelve el listado de documentos preparados para consumo y visualización en Power BI.
+ *     tags:
+ *       - Dataset
+ *     responses:
+ *       200:
+ *         description: Lista de documentos obtenida correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: number
+ *                     example: 1
+ *                   title:
+ *                     type: string
+ *                     example: Bienestar laboral y salud mental
+ *                   author:
+ *                     type: string
+ *                     example: Organización Internacional del Trabajo
+ *                   topic:
+ *                     type: string
+ *                     example: Salud ocupacional
+ *                   source_org:
+ *                     type: string
+ *                     example: ILO
+ *                   year:
+ *                     type: number
+ *                     example: 2025
+ *                   document_type:
+ *                     type: string
+ *                     example: Informe
+ *                   source_url:
+ *                     type: string
+ *                     example: https://example.org/document.pdf
+ */
+router.get(
+  '/dataset/powerbi/documents',
+  asyncHandler(async (_req, res) => {
+    res.json(await listDatasetPowerBiDocuments());
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset/pivot:
+ *   get:
+ *     summary: Obtener datos dinámicos tipo pivot del dataset
+ *     description: Devuelve información agrupada y filtrada dinámicamente para análisis estadístico y visualización.
+ *     tags:
+ *       - Dataset
+ *     parameters:
+ *       - in: query
+ *         name: topic
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filtrar por temática
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: number
+ *         required: false
+ *         description: Filtrar por año
+ *       - in: query
+ *         name: source
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filtrar por fuente documental
+ *     responses:
+ *       200:
+ *         description: Datos pivot obtenidos correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rows:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 summary:
+ *                   type: object
+ */
+router.get(
+  '/dataset/pivot',
+  asyncHandler(async (req, res) => {
+    res.json(await loadDatasetPivot(req.query));
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset:
+ *   get:
+ *     summary: Obtener documentos del dataset
+ *     description: Devuelve el listado de documentos del dataset documental con soporte de filtros mediante query params.
+ *     tags:
+ *       - Dataset
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Texto de búsqueda general
+ *       - in: query
+ *         name: topic
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filtrar por temática
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: number
+ *         required: false
+ *         description: Filtrar por año
+ *     responses:
+ *       200:
+ *         description: Lista de documentos obtenida correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: number
+ *                         example: 1
+ *                       title:
+ *                         type: string
+ *                         example: Salud mental y bienestar laboral
+ *                       author:
+ *                         type: string
+ *                         example: Organización Internacional del Trabajo
+ *                       topic:
+ *                         type: string
+ *                         example: Riesgos psicosociales
+ *                       source_org:
+ *                         type: string
+ *                         example: ILO
+ *                       year:
+ *                         type: number
+ *                         example: 2025
+ *                       document_type:
+ *                         type: string
+ *                         example: Informe
+ *                       source_url:
+ *                         type: string
+ *                         example: https://example.org/document.pdf
+ */
+router.get(
+  '/dataset',
+  asyncHandler(async (req, res) => {
+    res.json({ items: await listDatasetDocuments(req.query) });
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset/{id}:
+ *   get:
+ *     summary: Obtener un documento del dataset por ID
+ *     description: Devuelve la información detallada de un documento específico del dataset documental.
+ *     tags:
+ *       - Dataset
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del documento
+ *     responses:
+ *       200:
+ *         description: Documento obtenido correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 item:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: number
+ *                       example: 1
+ *                     title:
+ *                       type: string
+ *                       example: Salud ocupacional y teletrabajo
+ *                     author:
+ *                       type: string
+ *                       example: Organización Internacional del Trabajo
+ *                     topic:
+ *                       type: string
+ *                       example: Bienestar laboral
+ *                     source_org:
+ *                       type: string
+ *                       example: ILO
+ *                     year:
+ *                       type: number
+ *                       example: 2025
+ *                     document_type:
+ *                       type: string
+ *                       example: Informe técnico
+ *                     source_url:
+ *                       type: string
+ *                       example: https://example.org/document.pdf
+ *       404:
+ *         description: Documento no encontrado
+ */
+router.get(
+  '/dataset/:id',
+  asyncHandler(async (req, res) => {
+    res.json({ item: await getDatasetDocument(req.params.id) });
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset:
+ *   post:
+ *     summary: Crear un documento en el dataset
+ *     description: Permite crear un nuevo documento documental en el dataset del observatorio. Requiere autenticación y permisos de administrador.
+ *     tags:
+ *       - Dataset
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Salud mental en el teletrabajo
+ *               author:
+ *                 type: string
+ *                 example: Organización Internacional del Trabajo
+ *               topic:
+ *                 type: string
+ *                 example: Riesgos psicosociales
+ *               source_org:
+ *                 type: string
+ *                 example: ILO
+ *               year:
+ *                 type: number
+ *                 example: 2025
+ *               document_type:
+ *                 type: string
+ *                 example: Informe
+ *               source_url:
+ *                 type: string
+ *                 example: https://example.org/document.pdf
+ *     responses:
+ *       201:
+ *         description: Documento creado correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 item:
+ *                   type: object
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Acceso denegado
+ */
+router.post(
+  '/dataset',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    res.status(201).json({ item: await createDatasetDocument(req.body) });
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset/{id}:
+ *   put:
+ *     summary: Actualizar un documento del dataset
+ *     description: Actualiza la información de un documento existente en el dataset documental. Requiere autenticación y permisos de administrador.
+ *     tags:
+ *       - Dataset
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del documento a actualizar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Salud mental y trabajo híbrido
+ *               author:
+ *                 type: string
+ *                 example: Organización Internacional del Trabajo
+ *               topic:
+ *                 type: string
+ *                 example: Bienestar laboral
+ *               source_org:
+ *                 type: string
+ *                 example: ILO
+ *               year:
+ *                 type: number
+ *                 example: 2025
+ *               document_type:
+ *                 type: string
+ *                 example: Informe técnico
+ *               source_url:
+ *                 type: string
+ *                 example: https://example.org/document.pdf
+ *     responses:
+ *       200:
+ *         description: Documento actualizado correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 item:
+ *                   type: object
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Acceso denegado
+ *       404:
+ *         description: Documento no encontrado
+ */
+router.put(
+  '/dataset/:id',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    res.json({ item: await updateDatasetDocument(req.params.id, req.body) });
+  })
+);
+
+/**
+ * @swagger
+ * /api/dataset/{id}:
+ *   delete:
+ *     summary: Eliminar un documento del dataset
+ *     description: Elimina un documento existente del dataset documental. Requiere autenticación y permisos de administrador.
+ *     tags:
+ *       - Dataset
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del documento a eliminar
+ *     responses:
+ *       204:
+ *         description: Documento eliminado correctamente
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Acceso denegado
+ *       404:
+ *         description: Documento no encontrado
+ */
+router.delete(
+  '/dataset/:id',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    await deleteDatasetDocument(req.params.id);
+    res.status(204).send();
+  })
+);
+
+/**
+ * @swagger
+ * /api/publications:
+ *   get:
+ *     summary: Obtener publicaciones
+ *     description: Devuelve el listado de publicaciones del observatorio con soporte de búsqueda y límite de resultados.
+ *     tags:
+ *       - Publications
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Texto de búsqueda para filtrar publicaciones
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: number
+ *         description: Número máximo de resultados a devolver
+ *     responses:
+ *       200:
+ *         description: Lista de publicaciones obtenida correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: number
+ *                         example: 1
+ *                       title:
+ *                         type: string
+ *                         example: Salud mental y riesgos psicosociales
+ *                       abstract:
+ *                         type: string
+ *                         example: Estudio sobre bienestar laboral en Iberoamérica.
+ *                       authors:
+ *                         type: string
+ *                         example: Juan Pérez, Ana Gómez
+ *                       country:
+ *                         type: string
+ *                         example: Colombia
+ *                       tags:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example:
+ *                           - bienestar
+ *                           - salud mental
+ *                       is_featured:
+ *                         type: boolean
+ *                         example: true
+ *                       published_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2025-05-14T10:00:00Z
+ */
 router.get(
   '/publications',
   asyncHandler(async (req, res) => {
@@ -495,6 +1212,61 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /api/publications/{id}:
+ *   get:
+ *     summary: Obtener una publicación por ID
+ *     description: Devuelve la información detallada de una publicación específica del observatorio.
+ *     tags:
+ *       - Publications
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la publicación
+ *     responses:
+ *       200:
+ *         description: Publicación obtenida correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 item:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: number
+ *                       example: 1
+ *                     title:
+ *                       type: string
+ *                       example: Salud mental en entornos laborales
+ *                     abstract:
+ *                       type: string
+ *                       example: Investigación sobre factores psicosociales en el trabajo.
+ *                     authors:
+ *                       type: string
+ *                       example: Juan Pérez, Ana Gómez
+ *                     country:
+ *                       type: string
+ *                       example: Colombia
+ *                     tags:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       example:
+ *                         - bienestar
+ *                         - salud ocupacional
+ *                     published_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: 2025-05-14T10:00:00Z
+ *       404:
+ *         description: Publicación no encontrada
+ */
 router.get(
   '/publications/:id',
   asyncHandler(async (req, res) => {
@@ -503,6 +1275,41 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /api/publications/{id}/file:
+ *   get:
+ *     summary: Descargar o visualizar archivo PDF de una publicación
+ *     description: Devuelve el archivo PDF asociado a una publicación. Puede visualizarse en el navegador o descargarse según el parámetro mode.
+ *     tags:
+ *       - Publications
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la publicación
+ *       - in: query
+ *         name: mode
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum:
+ *             - inline
+ *             - download
+ *         description: Define si el archivo se visualiza en navegador o se descarga.
+ *     responses:
+ *       200:
+ *         description: Archivo PDF obtenido correctamente
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Publicación no encontrada o sin PDF cargado
+ */
 router.get(
   '/publications/:id/file',
   asyncHandler(async (req, res) => {
@@ -525,6 +1332,70 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /api/publications:
+ *   post:
+ *     summary: Crear una publicación
+ *     description: Permite crear una nueva publicación y opcionalmente subir un archivo PDF asociado. Requiere autenticación y permisos de administrador.
+ *     tags:
+ *       - Publications
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Riesgos psicosociales en el teletrabajo
+ *               abstract:
+ *                 type: string
+ *                 example: Investigación sobre bienestar laboral y salud mental.
+ *               authors:
+ *                 type: string
+ *                 example: Juan Pérez, Ana Gómez
+ *               year:
+ *                 type: number
+ *                 example: 2025
+ *               country:
+ *                 type: string
+ *                 example: Colombia
+ *               tags:
+ *                 type: string
+ *                 example: salud mental,bienestar,teletrabajo
+ *               is_featured:
+ *                 type: boolean
+ *                 example: true
+ *               published_at:
+ *                 type: string
+ *                 format: date-time
+ *                 example: 2025-05-14T10:00:00Z
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: Publicación creada correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 item:
+ *                   type: object
+ *       400:
+ *         description: Datos inválidos
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Acceso denegado
+ */
 router.post(
   '/publications',
   requireAuth,
@@ -576,6 +1447,77 @@ router.post(
   })
 );
 
+/**
+ * @swagger
+ * /api/publications/{id}:
+ *   put:
+ *     summary: Actualizar una publicación
+ *     description: Actualiza la información de una publicación existente y opcionalmente reemplaza el archivo PDF asociado. Requiere autenticación y permisos de administrador.
+ *     tags:
+ *       - Publications
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la publicación a actualizar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Bienestar laboral y salud ocupacional
+ *               abstract:
+ *                 type: string
+ *                 example: Actualización de estudio sobre salud mental en el trabajo.
+ *               authors:
+ *                 type: string
+ *                 example: Ana Gómez, Carlos Ruiz
+ *               year:
+ *                 type: number
+ *                 example: 2025
+ *               country:
+ *                 type: string
+ *                 example: Colombia
+ *               tags:
+ *                 type: string
+ *                 example: bienestar,salud mental,teletrabajo
+ *               is_featured:
+ *                 type: boolean
+ *                 example: true
+ *               published_at:
+ *                 type: string
+ *                 format: date-time
+ *                 example: 2025-05-14T10:00:00Z
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Publicación actualizada correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 item:
+ *                   type: object
+ *       400:
+ *         description: No se enviaron campos válidos para actualizar
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Acceso denegado
+ *       404:
+ *         description: Publicación no encontrada
+ */
 router.put(
   '/publications/:id',
   requireAuth,
@@ -640,6 +1582,33 @@ router.put(
   })
 );
 
+/**
+ * @swagger
+ * /api/publications/{id}:
+ *   delete:
+ *     summary: Eliminar una publicación
+ *     description: Elimina una publicación existente y su archivo PDF asociado. Requiere autenticación y permisos de administrador.
+ *     tags:
+ *       - Publications
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la publicación a eliminar
+ *     responses:
+ *       204:
+ *         description: Publicación eliminada correctamente
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Acceso denegado
+ *       404:
+ *         description: Publicación no encontrada
+ */
 router.delete(
   '/publications/:id',
   requireAuth,

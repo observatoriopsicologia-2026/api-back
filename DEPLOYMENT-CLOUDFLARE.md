@@ -33,6 +33,34 @@ cuando el almacenamiento es R2 y PostgreSQL se conecta por su URI.
 
 ## Secuencia
 
+### Crear el bucket y las credenciales de R2
+
+1. Entrar en https://dash.cloudflare.com/ y abrir R2 Object Storage. La activacion
+   de R2 puede requerir un metodo de pago, que debe completar el propietario.
+   La cuota gratuita no es un limite que impida cobros por excedentes.
+2. Crear el bucket `observatorio-pdfs`, clase Standard, ubicacion automatica y
+   jurisdiccion predeterminada. La API usa el endpoint global de R2; no elegir
+   jurisdicciones especiales sin ajustar tambien ese endpoint.
+3. Mantener el bucket privado: no habilitar Public Development URL ni conectar
+   un dominio publico. La API entrega enlaces temporales firmados para los PDF.
+4. En R2 Overview, Account Details, abrir Manage junto a API Tokens. Crear un
+   token para la aplicacion con Object Read & Write, limitado unicamente a
+   `observatorio-pdfs`. No conceder permisos de administrador ni otros buckets.
+5. Guardar Access Key ID y Secret Access Key directamente en `api-back/.env`.
+   La clave secreta solo se muestra al crearla. No enviarla al chat ni a GitHub.
+   Copiar tambien el Account ID (32 caracteres hexadecimales) de Cloudflare.
+
+Las variables requeridas son `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY` y `R2_BUCKET=observatorio-pdfs`. Dejar `STORAGE_DRIVER=local`
+en desarrollo hasta comprobar el bucket y copiar los PDF existentes.
+`npm run storage:check` prueba R2 sin cambiar ese almacenamiento local.
+
+Referencias oficiales:
+https://developers.cloudflare.com/r2/buckets/create-buckets/
+https://developers.cloudflare.com/r2/api/tokens/
+
+### Publicar los proyectos
+
 1. Probar `DATABASE_URL`: `/api/health` debe indicar conexion correcta. Si el
    proveedor responde tenant/user not found, corregir la URI desde Connect;
    cambiar de almacenamiento no resuelve una conexion PostgreSQL invalida.
@@ -112,3 +140,18 @@ No se ha publicado un sitio, creado un servicio ni cargado PDF a R2 durante
 estas comprobaciones. Para hacerlo faltan las credenciales del bucket, acceso
 a los destinos de despliegue y cambiar las credenciales de desarrollo antes
 de exponer el administrador en internet.
+
+## Validacion previa a publicacion (2026-11-09)
+
+Se integraron los commits existentes de GitHub conservando la documentacion
+Swagger y los controles de seguridad locales. La documentacion esta disponible
+en `/api-docs/` y `/api-docs.json`, tambien al ejecutar el JavaScript compilado.
+Se fijo la dependencia transitiva glob de Swagger a 14.0.2; el analisis
+`npm audit --omit=dev` no reporto vulnerabilidades de produccion en la API.
+
+Pasaron 44 tests en backend (99.08% lineas, 95.75% ramas) y 24 en frontend
+(93.06% lineas, 91.08% ramas), ademas de las dos compilaciones de produccion.
+Se volvieron a comparar las 14 series con PostgreSQL y a revisar las 10 graficas
+con Playwright, filtros, clics, pixeles del canvas y capturas a 1440 y 390 px.
+Los conteos seguian siendo 854 documentos visibles, ILO 499 y UN 355.
+Estas comprobaciones locales no confirman un despliegue en internet.

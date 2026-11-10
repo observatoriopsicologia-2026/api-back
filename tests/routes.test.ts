@@ -631,6 +631,21 @@ test('dataset endpoints list, manage and expose Power BI rows', async () => {
   assert.equal(missingDelete.response.status, 404);
 });
 
+test('compiled API serves the preserved Swagger UI and its documented routes', async () => {
+  const spec = await request('GET', '/api-docs.json');
+  assert.equal(spec.response.status, 200);
+  assert.equal(spec.json.openapi, '3.0.0');
+  assert.ok(spec.json.paths['/api/health'].get);
+  assert.ok(spec.json.paths['/api/auth/login'].post);
+  assert.ok(spec.json.paths['/api/dataset'].get);
+  assert.ok(spec.json.paths['/api/dataset'].post);
+  assert.ok(spec.json.paths['/api/publications/{id}'].put);
+  const docs = await request('GET', '/api-docs/');
+  assert.equal(docs.response.status, 200);
+  assert.match(docs.text, /Swagger UI/);
+  assert.equal(docs.response.headers.get('x-content-type-options'), 'nosniff');
+});
+
 test('unknown routes return 404', async () => {
   setQueryImplementationForTests(async () => result([]));
 

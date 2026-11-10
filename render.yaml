@@ -1,15 +1,36 @@
 services:
   - type: web
     name: observatorio-pot-api
-    env: node
+    runtime: node
     plan: free
+    region: oregon
+    branch: main
     rootDir: .
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start:prod
+    healthCheckPath: /api/health
     envVars:
+      - key: NODE_VERSION
+        value: '24'
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
       - key: STORAGE_DRIVER
-        value: supabase
+        value: r2
+      - key: R2_BUCKET
+        value: observatorio-pdfs
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL_CA
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false

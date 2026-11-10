@@ -99,6 +99,14 @@ export function requireAuth(req: AuthRequest, _res: Response, next: NextFunction
   }
 }
 
+export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.headers.authorization) {
+    requireAuth(req, res, next);
+  } else {
+    next();
+  }
+}
+
 export function requireAdmin(req: AuthRequest, _res: Response, next: NextFunction) {
   if (!req.user || !['admin', 'editor'].includes(req.user.role)) {
     next(new HttpError(403, 'No tienes permisos para esta acción.'));

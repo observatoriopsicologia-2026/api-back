@@ -2,11 +2,22 @@ import { Router } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { requireAdmin, requireAuth, login, type AuthRequest } from './auth.js';
+import { requireAdmin, requireAuth, optionalAuth, login, type AuthRequest } from './auth.js';
 import { env } from './config.js';
+import {
+  createDatasetDocument,
+  deleteDatasetDocument,
+  getDatasetDocument,
+  listDatasetDocuments,
+  listDatasetPowerBiDocuments,
+  loadDatasetPivot,
+  loadDatasetAnalytics,
+  toDatasetPowerBiRows,
+  updateDatasetDocument
+} from './dataset.js';
 import { query } from './db.js';
 import { asyncHandler, HttpError } from './http.js';
-import { publicationStorage, safeDownloadName } from './storage.js';
+import { publicationStorage, pdfDisposition } from './storage.js';
 
 const router = Router();
 const upload = multer({
@@ -201,6 +212,234 @@ async function updateCollectionItem(name: CollectionName, id: string, body: Reco
   return result.rows[0] ?? recordNotFound();
 }
 
+interface MetricPoint {
+  label: string;
+  value: number;
+}
+
+interface AnalyticsSummaryRow {
+  publications: number | string;
+  publications_with_pdf: number | string;
+  researchers: number | string;
+  events: number | string;
+  news: number | string;
+  resources: number | string;
+  countries: number | string;
+  institutions: number | string;
+}
+
+interface LatestPublicationRow {
+  title: string;
+  authors: string;
+  country: string;
+  year: number | null;
+}
+
+interface AnalyticsData {
+  generated_at: string;
+  summary: {
+    publications: number;
+    publications_with_pdf: number;
+    researchers: number;
+    events: number;
+    news: number;
+    resources: number;
+    countries: number;
+    institutions: number;
+  };
+  publications_by_year: MetricPoint[];
+  publications_by_country: MetricPoint[];
+  publications_by_tag: MetricPoint[];
+  researchers_by_country: MetricPoint[];
+  researchers_by_specialty: MetricPoint[];
+  events_by_modality: MetricPoint[];
+  events_by_month: MetricPoint[];
+  news_by_month: MetricPoint[];
+  resources_by_type: MetricPoint[];
+  latest_publications: LatestPublicationRow[];
+}
+
+function toNumber(value: number | string | null | undefined) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function metricQuery(sql: string, params: unknown[] = []): Promise<MetricPoint[]> {
+  const result = await query<{ label: string | null; value: number | string }>(sql, params);
+  return result.rows.map((row) => ({
+    label: row.label?.trim() || 'Sin dato',
+    value: toNumber(row.value)
+  }));
+}
+
+async function loadAnalytics(): Promise<AnalyticsData> {
+  const [
+    summaryResult,
+    publicationsByYear,
+    publicationsByCountry,
+    publicationsByTag,
+    researchersByCountry,
+    researchersBySpecialty,
+    eventsByModality,
+    eventsByMonth,
+    newsByMonth,
+    resourcesByType,
+    latestPublications
+  ] = await Promise.all([
+    query<AnalyticsSummaryRow>(
+      `select
+        (select count(*)::int from publications) as publications,
+        (select count(*)::int from publications where file_path is not null) as publications_with_pdf,
+        (select count(*)::int from researchers) as researchers,
+        (select count(distinct nullif(trim(institution), ''))::int from researchers) as institutions,
+        (select count(*)::int from events) as events,
+        (select count(*)::int from news) as news,
+        (select count(*)::int from resources) as resources,
+        (
+          select count(*)::int
+          from (
+            select nullif(trim(country), '') as country from publications
+            union
+            select nullif(trim(country), '') as country from researchers
+          ) countries
+          where country is not null
+        ) as countries`
+    ),
+    metricQuery(
+      `select coalesce(year, extract(year from published_at)::int)::text as label, count(*)::int as value
+       from publications
+       where coalesce(year, extract(year from published_at)::int) is not null
+       group by coalesce(year, extract(year from published_at)::int)
+       order by coalesce(year, extract(year from published_at)::int)`
+    ),
+    metricQuery(
+      `select country as label, count(*)::int as value
+       from publications
+       where nullif(trim(country), '') is not null
+       group by country
+       order by value desc, label asc
+       limit 10`
+    ),
+    metricQuery(
+      `select tag as label, count(*)::int as value
+       from publications, unnest(tags) tag
+       where nullif(trim(tag), '') is not null
+       group by tag
+       order by value desc, label asc
+       limit 10`
+    ),
+    metricQuery(
+      `select country as label, count(*)::int as value
+       from researchers
+       where nullif(trim(country), '') is not null
+       group by country
+       order by value desc, label asc
+       limit 10`
+    ),
+    metricQuery(
+      `select specialty as label, count(*)::int as value
+       from researchers
+       where nullif(trim(specialty), '') is not null
+       group by specialty
+       order by value desc, label asc
+       limit 10`
+    ),
+    metricQuery(
+      `select coalesce(nullif(trim(modality), ''), 'Sin modalidad') as label, count(*)::int as value
+       from events
+       group by coalesce(nullif(trim(modality), ''), 'Sin modalidad')
+       order by value desc, label asc`
+    ),
+    metricQuery(
+      `select to_char(date_trunc('month', starts_at), 'YYYY-MM') as label, count(*)::int as value
+       from events
+       where starts_at is not null
+       group by date_trunc('month', starts_at)
+       order by date_trunc('month', starts_at)`
+    ),
+    metricQuery(
+      `select to_char(date_trunc('month', published_at), 'YYYY-MM') as label, count(*)::int as value
+       from news
+       where published_at is not null
+       group by date_trunc('month', published_at)
+       order by date_trunc('month', published_at)`
+    ),
+    metricQuery(
+      `select coalesce(nullif(trim(type), ''), 'Sin tipo') as label, count(*)::int as value
+       from resources
+       group by coalesce(nullif(trim(type), ''), 'Sin tipo')
+       order by value desc, label asc
+       limit 10`
+    ),
+    query<LatestPublicationRow>(
+      `select title, authors, country, year
+       from publications
+       order by published_at desc nulls last, created_at desc
+       limit 5`
+    )
+  ]);
+
+  const summary = summaryResult.rows[0];
+
+  return {
+    generated_at: new Date().toISOString(),
+    summary: {
+      publications: toNumber(summary?.publications),
+      publications_with_pdf: toNumber(summary?.publications_with_pdf),
+      researchers: toNumber(summary?.researchers),
+      events: toNumber(summary?.events),
+      news: toNumber(summary?.news),
+      resources: toNumber(summary?.resources),
+      countries: toNumber(summary?.countries),
+      institutions: toNumber(summary?.institutions)
+    },
+    publications_by_year: publicationsByYear,
+    publications_by_country: publicationsByCountry,
+    publications_by_tag: publicationsByTag,
+    researchers_by_country: researchersByCountry,
+    researchers_by_specialty: researchersBySpecialty,
+    events_by_modality: eventsByModality,
+    events_by_month: eventsByMonth,
+    news_by_month: newsByMonth,
+    resources_by_type: resourcesByType,
+    latest_publications: latestPublications.rows
+  };
+}
+
+function toPowerBiRows(data: AnalyticsData) {
+  const summaryRows = [
+    { label: 'Publicaciones', value: data.summary.publications },
+    { label: 'Publicaciones con PDF', value: data.summary.publications_with_pdf },
+    { label: 'Investigadores', value: data.summary.researchers },
+    { label: 'Eventos', value: data.summary.events },
+    { label: 'Noticias', value: data.summary.news },
+    { label: 'Recursos', value: data.summary.resources },
+    { label: 'Paises', value: data.summary.countries }
+  ];
+
+  const sections: Array<[string, MetricPoint[]]> = [
+    ['Resumen', summaryRows],
+    ['Publicaciones por ano', data.publications_by_year],
+    ['Publicaciones por pais', data.publications_by_country],
+    ['Publicaciones por etiqueta', data.publications_by_tag],
+    ['Investigadores por pais', data.researchers_by_country],
+    ['Investigadores por especialidad', data.researchers_by_specialty],
+    ['Eventos por modalidad', data.events_by_modality],
+    ['Eventos por mes', data.events_by_month],
+    ['Noticias por mes', data.news_by_month],
+    ['Recursos por tipo', data.resources_by_type]
+  ];
+
+  return sections.flatMap(([metric, points]) =>
+    points.map((point) => ({
+      metric,
+      label: point.label,
+      value: point.value,
+      generated_at: data.generated_at
+    }))
+  );
+}
+
 router.get(
   '/health',
   asyncHandler(async (_req, res) => {
@@ -212,19 +451,22 @@ router.get(
         await query('select 1 as ok');
         databaseConnected = true;
       } catch (error) {
-        databaseError = error instanceof Error ? error.message : 'Unknown database error';
+        databaseError = env.nodeEnv === 'production'
+          ? 'Database unavailable'
+          : error instanceof Error ? error.message : 'Unknown database error';
         databaseConnected = false;
       }
     }
 
-  res.json({
-    ok: true,
-    service: 'observatorio-pot-api',
-    databaseConfigured: Boolean(env.databaseUrl),
+    const ready = databaseConnected || env.nodeEnv !== 'production';
+    res.status(ready ? 200 : 503).json({
+      ok: ready,
+      service: 'observatorio-pot-api',
+      databaseConfigured: Boolean(env.databaseUrl),
       databaseConnected,
       databaseError,
-    storageDriver: env.storageDriver
-  });
+      storageDriver: env.storageDriver
+    });
   })
 );
 
@@ -239,6 +481,94 @@ router.post(
 router.get('/auth/me', requireAuth, (req: AuthRequest, res) => {
   res.json({ user: req.user });
 });
+
+router.get(
+  '/analytics',
+  asyncHandler(async (_req, res) => {
+    res.json(await loadAnalytics());
+  })
+);
+
+router.get(
+  '/analytics/powerbi',
+  asyncHandler(async (_req, res) => {
+    res.json(toPowerBiRows(await loadAnalytics()));
+  })
+);
+
+router.get(
+  '/dataset/analytics',
+  asyncHandler(async (_req, res) => {
+    res.json(await loadDatasetAnalytics());
+  })
+);
+
+router.get(
+  '/dataset/powerbi',
+  asyncHandler(async (_req, res) => {
+    res.json(toDatasetPowerBiRows(await loadDatasetAnalytics()));
+  })
+);
+
+router.get(
+  ['/dataset/documents', '/dataset/powerbi/documents'],
+  asyncHandler(async (_req, res) => {
+    res.json(await listDatasetPowerBiDocuments());
+  })
+);
+
+router.get(
+  '/dataset/pivot',
+  asyncHandler(async (req, res) => {
+    res.json(await loadDatasetPivot(req.query));
+  })
+);
+
+router.get(
+  '/dataset',
+  optionalAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const includeHidden = !!req.user && ['admin', 'editor'].includes(req.user.role);
+    res.json({ items: await listDatasetDocuments(req.query, includeHidden) });
+  })
+);
+
+router.get(
+  '/dataset/:id',
+  optionalAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const includeHidden = !!req.user && ['admin', 'editor'].includes(req.user.role);
+    res.json({ item: await getDatasetDocument(req.params.id, includeHidden) });
+  })
+);
+
+router.post(
+  '/dataset',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    res.status(201).json({ item: await createDatasetDocument(req.body) });
+  })
+);
+
+router.put(
+  '/dataset/:id',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    res.json({ item: await updateDatasetDocument(req.params.id, req.body) });
+  })
+);
+
+router.delete(
+  '/dataset/:id',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    await deleteDatasetDocument(req.params.id);
+    res.status(204).send();
+  })
+);
 
 router.get(
   '/publications',
@@ -279,10 +609,15 @@ router.get(
       throw new HttpError(404, 'Esta publicación no tiene PDF cargado.');
     }
 
+    const url = await publicationStorage.fileUrl(item.file_path, item.file_name, req.query.mode === 'download');
+    if (url) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.redirect(302, url);
+      return;
+    }
     const file = await publicationStorage.download(item.file_path);
-    const disposition = req.query.mode === 'download' ? 'attachment' : 'inline';
     res.setHeader('Content-Type', item.file_mime || file.contentType || 'application/pdf');
-    res.setHeader('Content-Disposition', `${disposition}; filename="${safeDownloadName(item.file_name)}"`);
+    res.setHeader('Content-Disposition', pdfDisposition(item.file_name, req.query.mode === 'download'));
     res.send(file.buffer);
   })
 );

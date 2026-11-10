@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { env } from './config.js';
 
 export class HttpError extends Error {
   status: number;
@@ -37,6 +38,6 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
   }
 
   res.status(status).json({
-    error: message
+    error: env.nodeEnv === 'production' && status >= 500 ? 'No pudimos completar la solicitud.' : message
   });
 }

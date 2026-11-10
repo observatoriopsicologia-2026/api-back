@@ -1,9 +1,11 @@
 node_modules/
 dist/
+.test-dist/
 .env
 .env.*
 !.env.example
 uploads/
 coverage/
+/.local-recovery/
 *.log
 

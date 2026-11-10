@@ -6,6 +6,6 @@ const app = createApp();
 
 await seedAdminUser();
 
-app.listen(env.port, () => {
+app.listen(env.port, '0.0.0.0', () => {
   console.info(`Observatorio POT API listening on http://localhost:${env.port}`);
 });

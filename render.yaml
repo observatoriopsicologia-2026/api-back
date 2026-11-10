@@ -24,8 +24,6 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
-      - key: DATABASE_SSL_CA
-        sync: false
       - key: CLIENT_ORIGIN
         sync: false
       - key: R2_ACCOUNT_ID

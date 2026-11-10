@@ -71,6 +71,9 @@ https://developers.cloudflare.com/r2/api/tokens/
    sustituyendo el origen por el real. No autorizar origenes comodin innecesarios.
 4. Publicar API y configurar todas las variables indicadas en README. Revisar
    permisos RLS en `database/production-security.sql` antes de ejecutarlo.
+   El Blueprint no pide `DATABASE_SSL_CA`: el certificado publico de Supabase
+   ya esta incluido en el repositorio y se usa automaticamente. Solo definir
+   esa variable si se necesita sustituir el certificado por uno personalizado.
 5. Configurar `API_URL` en las variables de compilacion de Cloudflare Pages con
    la URL HTTPS real de Render terminada en `/api`; publicar de nuevo Pages.
    El comando `prebuild` genera el ambiente publico; las claves nunca van alli.

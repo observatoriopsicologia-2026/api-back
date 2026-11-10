@@ -1,0 +1,17 @@
+{
+  "rules": [
+    {
+      "id": "observatorio-publication-previews",
+      "allowed": {
+        "origins": [
+          "https://observatorio-pot-ucatolica.pages.dev",
+          "http://localhost:4200"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["Range"]
+      },
+      "exposeHeaders": ["Content-Length", "Content-Range", "Content-Disposition", "Accept-Ranges"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

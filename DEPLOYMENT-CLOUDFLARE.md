@@ -55,6 +55,16 @@ Las variables requeridas son `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
 en desarrollo hasta comprobar el bucket y copiar los PDF existentes.
 `npm run storage:check` prueba R2 sin cambiar ese almacenamiento local.
 
+`deployment/r2-cors.example.json` usa el formato del editor del dashboard.
+Wrangler usa un formato diferente, guardado en `deployment/r2-cors.wrangler.json`.
+Ese archivo permite GET/HEAD desde el frontend de produccion y el frontend local,
+sin publicar el bucket ni permitir escrituras desde el navegador. Para aplicarlo
+con Wrangler autorizado en la cuenta del Observatorio:
+
+```powershell
+npx wrangler@4.159.0 r2 bucket cors set observatorio-pdfs --file deployment/r2-cors.wrangler.json
+```
+
 Referencias oficiales:
 https://developers.cloudflare.com/r2/buckets/create-buckets/
 https://developers.cloudflare.com/r2/api/tokens/
@@ -158,3 +168,41 @@ Se volvieron a comparar las 14 series con PostgreSQL y a revisar las 10 graficas
 con Playwright, filtros, clics, pixeles del canvas y capturas a 1440 y 390 px.
 Los conteos seguian siendo 854 documentos visibles, ILO 499 y UN 355.
 Estas comprobaciones locales no confirman un despliegue en internet.
+
+## Publicacion completada (2026-11-09)
+
+- Web: https://observatorio-pot-ucatolica.pages.dev
+- Administracion: https://observatorio-pot-ucatolica.pages.dev/admin
+- API: https://observatorio-pot-api-7kc0.onrender.com/api
+- Estado: https://observatorio-pot-api-7kc0.onrender.com/api/health
+- Servicio Render `observatorio-pot-api-7kc0`, plan `free`, Node 24, rama `main`.
+- Pages `observatorio-pot-ucatolica`, produccion en `main`, modalidad Direct Upload.
+
+El backend se actualiza automaticamente con los commits de GitHub. El frontend
+NO esta conectado a Git: compilar y subir `dist/observatorio-pot-web/browser`
+con Wrangler, como indica el README de `api-front`. El ambiente de produccion
+del frontend contiene solo la URL publica de la API; no incluye claves privadas.
+
+Se copian y verifican los dos PDF de publicaciones existentes a `observatorio-pdfs`,
+conservando las claves y los archivos locales. El bucket sigue privado, con
+`r2.dev` deshabilitado. Los enlaces firmados de preview y descarga duran cinco
+minutos. Las variables R2 se guardaron en el `.env` ignorado por Git y en Render;
+no se incluyeron en los repositorios. El backend local tambien usa R2 para evitar
+referencias compartidas a archivos que solo existan en disco local.
+
+Se verificaron en las URLs publicas los 854 documentos (ILO 499, UN 355), las
+diez graficas y sus filtros a 1440 y 390 px, totales de la matriz, clics en barras,
+rutas SPA, ausencia de errores de aplicacion y de desbordamiento horizontal.
+Pasaron login/logout de administrador, permisos de documentos ocultos, CRUD,
+subida de PDF, preview/descarga y checksums de ambos PDF originales. Los unicos
+registros y objetos eliminados fueron los temporales de las pruebas.
+
+Pasaron 44 tests de backend y 24 de frontend con las coberturas indicadas arriba.
+`npm audit --omit=dev` no reporto vulnerabilidades en ninguno de los dos proyectos.
+La informacion del dataset permanece en PostgreSQL; el respaldo de los documentos
+originales de Drive no se subio masivamente a R2 ni se incluyo en Git.
+
+No se contrato un servicio Render de pago ni se retiro el metodo de pago de
+Cloudflare. R2 sigue sujeto a sus cuotas y cobros por excedentes; los dos PDF
+migrados suman 730614 bytes. Render gratuito puede suspenderse por inactividad,
+por lo que debe comprobarse el arranque antes de la conferencia.
